@@ -1,37 +1,40 @@
-name: Auto Update Live Sources
+name: Update Live Sources
 
 on:
   schedule:
-    # 每天北京时间 06:00 和 18:00 自动执行一次
-    - cron: '0 22,10 * * *' 
-  workflow_dispatch: # 允许在 GitHub 界面手动触发
+    - cron: '0 2,14 * * *'  # 每天 UTC 02:00 和 14:00（北京时间 10:00/22:00）
+  workflow_dispatch:  # 允许手动触发
 
 jobs:
-  update-sources:
+  update:
     runs-on: ubuntu-latest
-    
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: main
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.x'
+          python-version: '3.11'
 
       - name: Install dependencies
-        run: pip install requests # 根据你脚本的实际依赖进行修改
+        run: pip install requests
 
       - name: Run scraper script
-        run: python your_scraper_script.py # 替换为你的脚本文件名
-
-      - name: Commit and push changes
+        id: run_script
         run: |
-          git config --global user.name 'github-actions[bot]'
-          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
-          git add .
-          # 只有当文件有变化时才提交，避免空提交
-          git diff --staged --quiet || git commit -m "Auto-update live sources"
+          python update_live_sources.py
+          echo "changes_detected=true" >> $GITHUB_OUTPUT
+
+      - name: Commit changes
+        if: steps.run_script.outputs.changes_detected == 'true'
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add live_sources.m3u
+          git commit -m "Auto-update: $(date -u +'%Y-%m-%d %H:%M UTC')" || exit 0
           git push
 
 
